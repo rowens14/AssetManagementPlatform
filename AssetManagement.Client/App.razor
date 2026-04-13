@@ -1,0 +1,597 @@
+@using AssetManagement.Shared.Models.DTOs.Audit
+@using AssetManagement.Shared.Models.DTOs.Dashboard
+@*
+    FILE:    App.razor
+    PROJECT: AssetManagement.Client
+    PURPOSE: Root Blazor component and application shell. Renders the entire UI tree.
+             Shows the login page when no user is authenticated; once logged in, renders
+             the persistent top navigation bar, the dark-navy sidebar (AppNavigationSidebar),
+             and the active page component inside the main content area.
+             Also owns all modal dialogs (Create/Edit Asset, Assign Asset, Update Lifecycle
+             Status, Add/Edit License) so they overlay correctly above all page content.
+             Listens to ClientApplicationState.OnChange to trigger re-renders when server
+             data changes. Named App.razor because Blazor's framework requires this exact
+             filename as the application root component.
+*@
+
+@inject ClientApplicationState State
+@implements IDisposable
+
+@if (State.CurrentUser == null)
+{
+    <UserLoginPage />
+}
+else
+{
+    <div class="shell">
+        <AppNavigationSidebar />
+        <main class="main">
+            <div class="topbar">
+                <div class="topbar-title">@GetPageTitle()</div>
+                <div class="topbar-actions">
+                    @if (State.CanEdit && State.CurrentPage == "hardware" && detailAsset == null)
+                    {
+                        <button class="btn btn-primary" @onclick="() => ShowAssetModal(null)">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+                            </svg>
+                            Create Asset
+                        </button>
+                    }
+                    @if (State.CanEdit && State.CurrentPage == "software")
+                    {
+                        <button class="btn btn-primary" @onclick="() => ShowLicenseModal(null)">
+                            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+                            </svg>
+                            Add Software License
+                        </button>
+                    }
+                </div>
+            </div>
+            <div class="content">
+                @if (State.IsLoading)
+                {
+                    <div class="loading-overlay">
+                        <div class="spinner"></div>
+                        Loading data…
+                    </div>
+                }
+                else
+                {
+                    @switch (State.CurrentPage)
+                    {
+                        case "hardware":
+                            @if (detailAsset != null)
+                            {
+                                <AssetDetailViewPage
+                                    Asset="detailAsset"
+                                    OnBack="HideDetail"
+                                    OnEdit="ShowAssetModal"
+                                    OnAssign="ShowAssignModal"
+                                    OnUpdateStatus="ShowLifecycleModal"
+                                    OnDeleted="HideDetail" />
+                            }
+                            else
+                            {
+                                <HardwareInventoryPage
+                                    OnCreate="() => ShowAssetModal(null)"
+                                    OnViewDetail="ShowDetail"
+                                    OnEdit="ShowAssetModal" />
+                            }
+                            break;
+                        case "software":
+                            <SoftwareLicensesPage OnEdit="ShowLicenseModal" />
+                            break;
+                        case "audit":
+                            <AuditLogViewerPage />
+                            break;
+                        case "reports":
+                            <InventoryReportsPage />
+                            break;
+                        default:
+                            <HardwareInventoryPage
+                                OnCreate="() => ShowAssetModal(null)"
+                                OnViewDetail="ShowDetail"
+                                OnEdit="ShowAssetModal" />
+                            break;
+                    }
+                }
+            </div>
+        </main>
+    </div>
+
+    <!-- ═══ MODAL: CREATE / EDIT ASSET (Screen 3) ═══ -->
+    <div class="modal-backdrop @(showAssetModal ? "open" : "")">
+        <div class="modal modal-lg">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">@(isNewAsset ? "Create New Asset Record" : "Edit Asset Record")</div>
+                    <div class="modal-sub">@(isNewAsset ? "Screen 3: Asset Onboarding" : "Edit Asset")</div>
+                </div>
+                <button class="modal-close" @onclick="() => showAssetModal = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-2col">
+                    <!-- LEFT: Core ID + Lifecycle -->
+                    <div>
+                        <div class="form-section">Core Identification</div>
+                        <div class="form-row form-row-2">
+                            <div class="form-group">
+                                <label>Asset ID <span class="req">*</span></label>
+                                <input type="text" @bind="editingAsset.AssetCode" placeholder="e.g. AST-004" />
+                            </div>
+                            <div class="form-group">
+                                <label>Asset Tag <span class="req">*</span></label>
+                                <input type="text" @bind="editingAsset.AssetTag" placeholder="e.g. TAG-1004" />
+                            </div>
+                        </div>
+                        <div class="form-row form-row-2">
+                            <div class="form-group">
+                                <label>Serial Number <span class="req">*</span></label>
+                                <input type="text" @bind="editingAsset.SerialNumber" placeholder="Manufacturer serial" />
+                            </div>
+                            <div class="form-group">
+                                <label>Hostname</label>
+                                <input type="text" @bind="editingAsset.Hostname" placeholder="e.g. NAP-LT-001" />
+                            </div>
+                        </div>
+
+                        <div class="form-section" style="margin-top:18px;">Lifecycle &amp; Location</div>
+                        <div class="form-row form-row-2">
+                            <div class="form-group">
+                                <label>Site <span class="req">*</span></label>
+                                <select @bind="editingAsset.SiteId">
+                                    @foreach (var s in State.Sites) { <option value="@s.Id">@s.Name</option> }
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Lifecycle Status <span class="req">*</span></label>
+                                <select @bind="editingAsset.LifecycleStatus">
+                                    @foreach (var s in lifecycleStatuses) { <option>@s</option> }
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Description</label>
+                            <input type="text" @bind="editingAsset.Description" placeholder="Optional notes" />
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: Specs + Security -->
+                    <div>
+                        <div class="form-section">Specifications</div>
+                        <div class="form-row form-row-2">
+                            <div class="form-group">
+                                <label>Type <span class="req">*</span></label>
+                                <select @bind="editingAsset.AssetType">
+                                    @foreach (var t in assetTypes) { <option>@t</option> }
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Manufacturer <span class="req">*</span></label>
+                                <input type="text" @bind="editingAsset.Manufacturer" placeholder="Dell, Apple, HP…" />
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-bottom:18px;">
+                            <label>Model <span class="req">*</span></label>
+                            <input type="text" @bind="editingAsset.Model" placeholder="Model name / number" />
+                        </div>
+
+                        <!-- Security section — IT Analyst / Admin only (Screen 3 mockup) -->
+                        <div class="sec-section">
+                            <div class="sec-section-title">
+                                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                                Security &amp; Compliance Section
+                            </div>
+                            <div class="sec-note">Visible only to IT Analyst roles.</div>
+                            @if (State.CurrentUser?.Role is "Admin" or "Manager")
+                            {
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label>Internal Compliance ID</label>
+                                    <input type="text" @bind="editingAsset.ComplianceId" placeholder="CMP-XXX" />
+                                </div>
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label>Encryption Protocol</label>
+                                    <input type="text" @bind="editingAsset.EncryptionProtocol" placeholder="BitLocker, FileVault…" />
+                                </div>
+                                <div class="form-group">
+                                    <label>Last Security Audit Date</label>
+                                    <input type="date" @bind="assetLastAudit" />
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="form-group" style="margin-bottom:10px;">
+                                    <label>Internal Compliance ID</label>
+                                    <div class="restricted-input">RESTRICTED_ACCESS_ONLY</div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Encryption Protocol</label>
+                                    <div class="restricted-input">RESTRICTED_ACCESS_ONLY</div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showAssetModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveAsset">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                    Save Asset Record
+                </button>
+            </div>
+            <div class="modal-req-footer">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Requirement Mapping: FR 01, FR 02, FR 07, FR 08
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ MODAL: ASSIGN ASSET (Screen 5) ═══ -->
+    <div class="modal-backdrop @(showAssignModal ? "open" : "")">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">Assign Asset</div>
+                    <div class="modal-sub">Screen 5: Modal Window</div>
+                </div>
+                <button class="modal-close" @onclick="() => showAssignModal = false">×</button>
+            </div>
+            <div class="modal-body">
+                @if (assigningAsset != null)
+                {
+                    <div class="asset-summary">
+                        <span class="asset-summary-code">@assigningAsset.AssetCode</span>
+                        <span class="asset-summary-desc">@assigningAsset.AssetType.ToUpper() · @assigningAsset.Model.ToUpper()</span>
+                    </div>
+                }
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>Assign to User</label>
+                    <select @bind="assignUserId">
+                        <option value="0">Select staff member…</option>
+                        @foreach (var u in State.Users.Where(u => u.IsActive))
+                        {
+                            <option value="@u.Id">@u.DisplayName (@u.Username)</option>
+                        }
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>
+                        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display:inline;vertical-align:middle;margin-right:3px;">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                            <line x1="3" y1="10" x2="21" y2="10"/>
+                        </svg>
+                        Effective Date
+                    </label>
+                    <input type="date" @bind="assignEffectiveDateDt" />
+                </div>
+                <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;margin-top:8px;" @onclick="SaveAssignment">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                    </svg>
+                    Save Assignment
+                </button>
+                <p style="font-size:11px;color:var(--text3);font-style:italic;text-align:center;margin-top:10px;">
+                    On save, this ownership change will be logged in the immutable audit trail (FR 09).
+                </p>
+            </div>
+            <div class="modal-req-footer">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Requirement Mapping: FR 03, FR 09
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ MODAL: UPDATE LIFECYCLE STATUS (Screen 6) ═══ -->
+    <div class="modal-backdrop @(showLifecycleModal ? "open" : "")">
+        <div class="modal modal-sm">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">Update Lifecycle Status</div>
+                    <div class="modal-sub">Screen 6: Modal Window</div>
+                </div>
+                <button class="modal-close" @onclick="() => showLifecycleModal = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group" style="margin-bottom:18px;">
+                    <label>Current Status</label>
+                    <div style="margin-top:6px;">
+                        <span class="status-pill">@(lifecycleAsset?.LifecycleStatus ?? "—")</span>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>New Lifecycle Status</label>
+                    <select @bind="lcNewStatus">
+                        @foreach (var s in lifecycleStatuses) { <option>@s</option> }
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reason for Change</label>
+                    <textarea @bind="lcReason" placeholder="Provide a reason for the lifecycle status update..."></textarea>
+                </div>
+                <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;margin-top:14px;" @onclick="SaveLifecycleEvent">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    Update Lifecycle
+                </button>
+            </div>
+            <div class="modal-req-footer">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                Requirement Mapping: FR 04, FR 09
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ MODAL: ADD / EDIT LICENSE ═══ -->
+    <div class="modal-backdrop @(showLicenseModal ? "open" : "")">
+        <div class="modal modal-md">
+            <div class="modal-header">
+                <div>
+                    <div class="modal-title">@(isNewLicense ? "Add Software License" : "Edit License")</div>
+                    <div class="modal-sub">Software &amp; Licenses</div>
+                </div>
+                <button class="modal-close" @onclick="() => showLicenseModal = false">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-row form-row-2">
+                    <div class="form-group">
+                        <label>Product Name <span class="req">*</span></label>
+                        <input type="text" @bind="editingLicense.Product" placeholder="e.g. Microsoft 365" />
+                    </div>
+                    <div class="form-group">
+                        <label>Vendor</label>
+                        <input type="text" @bind="editingLicense.Vendor" placeholder="e.g. Microsoft" />
+                    </div>
+                </div>
+                <div class="form-row form-row-3">
+                    <div class="form-group">
+                        <label>Site <span class="req">*</span></label>
+                        <select @bind="editingLicense.SiteId">
+                            @foreach (var s in State.Sites) { <option value="@s.Id">@s.Name</option> }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>License Type</label>
+                        <select @bind="editingLicense.Type">
+                            @foreach (var t in licenseTypes) { <option>@t</option> }
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Total Seats</label>
+                        <input type="number" min="0" @bind="licTotalInt" />
+                    </div>
+                </div>
+                <div class="form-row form-row-3">
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select @bind="editingLicense.Status">
+                            <option>Active</option><option>Expired</option><option>Cancelled</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" @bind="licStartDt" />
+                    </div>
+                    <div class="form-group">
+                        <label>Expiration Date</label>
+                        <input type="date" @bind="licExpiryDt" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" @onclick="() => showLicenseModal = false">Cancel</button>
+                <button class="btn btn-primary" @onclick="SaveLicense">Save License</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Toasts -->
+<div class="toast-container">
+    @foreach (var t in State.Toasts)
+    {
+        <div class="toast @t.Type">@t.Text</div>
+    }
+</div>
+
+@code {
+    // Detail navigation
+    AssetDto? detailAsset;
+
+    // Modal visibility
+    bool showAssetModal, showAssignModal, showLifecycleModal, showLicenseModal;
+    bool isNewAsset, isNewLicense;
+
+    // Asset form
+    SaveAssetRequest editingAsset = new();
+    DateTime? assetLastAudit;
+
+    // Assign form
+    AssetDto? assigningAsset;
+    int assignUserId;
+    DateTime? assignEffectiveDateDt;
+
+    // Lifecycle form
+    AssetDto? lifecycleAsset;
+    string lcNewStatus = "Available", lcReason = "";
+
+    // License form
+    SaveLicenseRequest editingLicense = new();
+    int licTotalInt;
+    DateTime? licStartDt, licExpiryDt;
+
+    static readonly string[] assetTypes       = ["Laptop","Desktop","Monitor","Printer","Server","Switch","Phone","Tablet","Other"];
+    static readonly string[] lifecycleStatuses = ["Available","Deployed","Maintenance","Retired","Disposed"];
+    static readonly string[] licenseTypes      = ["Per-Seat","Volume","OEM","Subscription","Enterprise"];
+
+    static DateTime? ToDateTime(DateOnly? d) => d.HasValue ? d.Value.ToDateTime(TimeOnly.MinValue) : null;
+    static DateOnly? ToDateOnly(DateTime? d) => d.HasValue ? DateOnly.FromDateTime(d.Value) : null;
+
+    protected override void OnInitialized()
+    {
+        State.OnChange += StateHasChanged;
+        assignEffectiveDateDt = DateTime.Today;
+    }
+
+    public void Dispose() => State.OnChange -= StateHasChanged;
+
+    string GetPageTitle() => detailAsset != null
+        ? $"Asset Detail: {detailAsset.AssetCode}"
+        : State.CurrentPage switch
+        {
+            "hardware" => "Hardware Inventory",
+            "software" => "Software & Licenses",
+            "audit"    => "Audit Log",
+            "reports"  => "Reports",
+            _          => "Hardware Inventory"
+        };
+
+    // ── Asset modal ──────────────────────────────────────────
+    void ShowAssetModal(AssetDto? asset)
+    {
+        isNewAsset = asset == null;
+        editingAsset = asset != null
+            ? new SaveAssetRequest
+              {
+                  Id = asset.Id, AssetCode = asset.AssetCode, AssetTag = asset.AssetTag,
+                  SerialNumber = asset.SerialNumber, AssetType = asset.AssetType,
+                  Manufacturer = asset.Manufacturer, Model = asset.Model,
+                  SiteId = asset.SiteId, LifecycleStatus = asset.LifecycleStatus,
+                  Hostname = asset.Hostname, Description = asset.Description,
+                  ComplianceId = asset.ComplianceId, EncryptionProtocol = asset.EncryptionProtocol,
+                  LastAudit = asset.LastAudit
+              }
+            : new SaveAssetRequest
+              {
+                  SiteId = State.Sites.FirstOrDefault()?.Id ?? 0,
+                  LifecycleStatus = "Available", AssetType = "Laptop"
+              };
+        assetLastAudit = ToDateTime(editingAsset.LastAudit);
+        showAssetModal = true;
+    }
+
+    async Task SaveAsset()
+    {
+        editingAsset.LastAudit = ToDateOnly(assetLastAudit);
+        var err = await State.SaveAssetAsync(editingAsset, isNewAsset);
+        if (err != null) { State.ShowToast(err, "error"); return; }
+        showAssetModal = false;
+    }
+
+    // ── Navigation helpers ──────────────────────────────────
+    void ShowDetail(AssetDto asset)
+    {
+        detailAsset = asset;
+        StateHasChanged();
+    }
+
+    void HideDetail()
+    {
+        detailAsset = null;
+        StateHasChanged();
+    }
+
+    // ── Assign modal ─────────────────────────────────────────
+    void ShowAssignModal(AssetDto asset)
+    {
+        assigningAsset = asset;
+        assignUserId = 0;
+        assignEffectiveDateDt = DateTime.Today;
+        showAssignModal = true;
+    }
+
+    async Task SaveAssignment()
+    {
+        if (assignUserId == 0 || assigningAsset == null)
+        {
+            State.ShowToast("Please select a user.", "error"); return;
+        }
+        var req = new CreateAssignmentRequest
+        {
+            AssetId = assigningAsset.Id, UserId = assignUserId,
+            EffectiveDate = ToDateOnly(assignEffectiveDateDt) ?? DateOnly.FromDateTime(DateTime.Today)
+        };
+        var err = await State.CreateAssignmentAsync(req);
+        if (err != null) { State.ShowToast(err, "error"); return; }
+        showAssignModal = false;
+        // Refresh detail view
+        if (detailAsset?.Id == assigningAsset.Id)
+            detailAsset = State.Assets.FirstOrDefault(a => a.Id == detailAsset.Id);
+    }
+
+    // ── Lifecycle modal ──────────────────────────────────────
+    void ShowLifecycleModal(AssetDto asset)
+    {
+        lifecycleAsset = asset;
+        lcNewStatus = asset.LifecycleStatus;
+        lcReason = "";
+        showLifecycleModal = true;
+    }
+
+    async Task SaveLifecycleEvent()
+    {
+        if (lifecycleAsset == null || string.IsNullOrWhiteSpace(lcReason))
+        {
+            State.ShowToast("Reason is required.", "error"); return;
+        }
+        var err = await State.CreateLifecycleEventAsync(new CreateLifecycleEventRequest
+        {
+            AssetId = lifecycleAsset.Id, NewStatus = lcNewStatus, Reason = lcReason
+        });
+        if (err != null) { State.ShowToast(err, "error"); return; }
+        showLifecycleModal = false;
+        if (detailAsset?.Id == lifecycleAsset.Id)
+            detailAsset = State.Assets.FirstOrDefault(a => a.Id == detailAsset.Id);
+    }
+
+    // ── License modal ────────────────────────────────────────
+    void ShowLicenseModal(LicenseDto? license)
+    {
+        isNewLicense = license == null;
+        editingLicense = license != null
+            ? new SaveLicenseRequest
+              {
+                  Id = license.Id, Product = license.Product, Vendor = license.Vendor,
+                  SiteId = license.SiteId, Type = license.Type, Total = license.Total,
+                  Start = license.Start, Expiry = license.Expiry, Status = license.Status
+              }
+            : new SaveLicenseRequest
+              {
+                  SiteId = State.Sites.FirstOrDefault()?.Id ?? 0,
+                  Status = "Active", Type = "Per-Seat"
+              };
+        licTotalInt = editingLicense.Total;
+        licStartDt  = ToDateTime(editingLicense.Start);
+        licExpiryDt = ToDateTime(editingLicense.Expiry);
+        showLicenseModal = true;
+    }
+
+    async Task SaveLicense()
+    {
+        editingLicense.Total  = licTotalInt;
+        editingLicense.Start  = ToDateOnly(licStartDt);
+        editingLicense.Expiry = ToDateOnly(licExpiryDt);
+        var err = await State.SaveLicenseAsync(editingLicense, isNewLicense);
+        if (err != null) { State.ShowToast(err, "error"); return; }
+        showLicenseModal = false;
+    }
+}

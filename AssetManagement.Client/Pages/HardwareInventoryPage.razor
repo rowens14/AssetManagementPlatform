@@ -1,0 +1,124 @@
+@*
+    FILE:    HardwareInventoryPage.razor
+    PROJECT: AssetManagement.Client / Pages
+    PURPOSE: Hardware asset inventory list (Screen 2 of the UI mockup). Displays all
+             hardware assets in a searchable, filterable table with columns for asset ID,
+             tag, type, model, site, lifecycle status, and current assignee. Supports
+             free-text search across asset code, tag, serial number, hostname and model,
+             plus dropdown filters for lifecycle status and office site.
+             Raises EventCallback<AssetDto> to App.razor when a user clicks View Details
+             (navigates to AssetDetailViewPage) or Edit (opens the asset modal).
+             Maps to Requirements FR 05, FR 07, FR 08.
+*@
+
+@inject ClientApplicationState State
+
+
+<div class="page-hdr">
+    <div class="page-hdr-left">
+        <h2>Asset Search &amp; Inventory List</h2>
+        
+    </div>
+    @if (State.CanEdit)
+    {
+        <button class="btn btn-primary" @onclick="() => OnCreate.InvokeAsync()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
+            </svg>
+            Create Asset
+        </button>
+    }
+</div>
+
+<div class="filter-bar">
+    <div class="filter-label">Search Assets</div>
+    <div class="search-box">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" @bind="searchQuery" @bind:event="oninput" placeholder="Asset ID, Tag, Serial, Hostname..." />
+    </div>
+    <div class="filter-label">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        </svg>
+        Site Filter
+    </div>
+    <select class="filter-select" @bind="siteFilter">
+        <option value="0">All Sites</option>
+        @foreach (var s in State.Sites) { <option value="@s.Id">@s.Name</option> }
+    </select>
+    <select class="filter-select" @bind="statusFilter">
+        <option value="">All Statuses</option>
+        <option>Available</option><option>Deployed</option>
+        <option>Maintenance</option><option>Retired</option><option>Disposed</option>
+    </select>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Asset ID</th>
+                    <th>Tag</th>
+                    <th>Type</th>
+                    <th>Model</th>
+                    <th>Site</th>
+                    <th>Status</th>
+                    <th>Assigned To</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{var rows = Filtered.ToList();}
+                @if (!rows.Any())
+                {
+                    <tr><td colspan="8"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No assets found</div></div></td></tr>
+                }
+                @foreach (var a in rows)
+                {
+                    var assigned = State.Assignments.FirstOrDefault(x => x.AssetId == a.Id && x.IsActive);
+                    var assignedUser = assigned != null ? State.GetUser(assigned.UserId)?.DisplayName : "—";
+                    <tr>
+                        <td><span class="chip td-bold">@a.AssetCode</span></td>
+                        <td class="td-mono">@a.AssetTag</td>
+                        <td>@a.AssetType</td>
+                        <td>@a.Model</td>
+                        <td>@(State.GetSite(a.SiteId)?.Name ?? "—")</td>
+                        <td><AssetStatusBadge Status="@a.LifecycleStatus" /></td>
+                        <td>@assignedUser</td>
+                        <td>
+                            <button class="action-link" @onclick="() => OnViewDetail.InvokeAsync(a)">
+                                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                View Details
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    [Parameter] public EventCallback OnCreate { get; set; }
+    [Parameter] public EventCallback<AssetDto> OnViewDetail { get; set; }
+    [Parameter] public EventCallback<AssetDto> OnEdit { get; set; }
+
+    string searchQuery = "", statusFilter = "";
+    int siteFilter = 0;
+
+    IEnumerable<AssetDto> Filtered => State.Assets.Where(a =>
+    {
+        var q = searchQuery.ToLower();
+        if (!string.IsNullOrEmpty(q) && !new[] { a.AssetCode, a.AssetTag, a.SerialNumber, a.AssetType, a.Manufacturer, a.Model, a.Hostname }
+            .Any(v => v?.ToLower().Contains(q) == true)) return false;
+        if (!string.IsNullOrEmpty(statusFilter) && a.LifecycleStatus != statusFilter) return false;
+        if (siteFilter != 0 && a.SiteId != siteFilter) return false;
+        return true;
+    });
+}

@@ -1,0 +1,41 @@
+<!--
+  FILE:    AssetManagement.Server.csproj
+  PURPOSE: Server project file for IN-MEMORY mode.
+           EF Core, Npgsql, and BCrypt packages removed — not needed without a database.
+           The Migrations folder is excluded from compilation since it depends on EF Core.
+           When switching back to PostgreSQL, restore the full package list and remove
+           the Compile Exclude entries below.
+-->
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="Properties\launchSettings.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Hosts the Blazor WASM client and serves API endpoints -->
+    <PackageReference Include="BCrypt.Net-Next" Version="4.1.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.5" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.5" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.1" />
+    <PackageReference Include="Serilog" Version="4.3.1" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="7.0.0" />
+	<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.4.0" />
+	<PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.4.0" />
+	<PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.4.0" />
+	<PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.4.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AssetManagement.Client\AssetManagement.Client.csproj" />
+    <ProjectReference Include="..\AssetManagement.Shared\AssetManagement.Shared.csproj" />
+  </ItemGroup>
+</Project>

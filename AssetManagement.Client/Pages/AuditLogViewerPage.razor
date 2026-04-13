@@ -1,0 +1,113 @@
+@using AssetManagement.Shared.Models.DTOs.Audit
+@*
+    FILE:    AuditLogViewerPage.razor
+    PROJECT: AssetManagement.Client / Pages
+    PURPOSE: Immutable audit log viewer (Screen 8 of the UI mockup). Displays all
+             compliance audit entries — who did what, to which asset, and when.
+             Entries are append-only and cannot be edited or deleted (enforced at both
+             the API and database level). Supports free-text search across username,
+             action, and target fields, and filtering by action type. Shows the
+             SHA-256 integrity notice in the footer confirming tamper detection is active.
+             Maps to Requirements FR 07, FR 09.
+*@
+
+@inject ClientApplicationState State
+
+
+<div class="page-hdr">
+    <div class="page-hdr-left">
+        <h2>Immutable Audit Log Viewer</h2>
+        
+    </div>
+    <div class="audit-banner">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Entries Cannot Be Edited or Deleted
+    </div>
+</div>
+
+<div class="filter-bar">
+    <div class="filter-label">Filter by Asset ID / User</div>
+    <div class="search-box" style="flex:1">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" @bind="searchQuery" @bind:event="oninput" placeholder="Search log entries..." />
+    </div>
+    <div class="filter-label">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+        </svg>
+        Action Type
+    </div>
+    <select class="filter-select" @bind="actionFilter">
+        <option value="">All Actions</option>
+        <option>Created asset</option>
+        <option>Updated asset</option>
+        <option>Assigned asset</option>
+        <option>Deleted asset</option>
+        <option>Updated lifecycle</option>
+    </select>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Asset ID</th>
+                    <th>Old Value</th>
+                    <th>New Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{var rows = Filtered.ToList();}
+                @if (!rows.Any())
+                {
+                    <tr><td colspan="7"><div class="empty-state"><div class="empty-text">No audit entries found</div></div></td></tr>
+                }
+                @foreach (var e in rows)
+                {
+                    var badgeClass = e.Action.ToLower().Contains("creat") ? "create"
+                        : e.Action.ToLower().Contains("assign") ? "assign"
+                        : e.Action.ToLower().Contains("delet") ? "delete"
+                        : "update";
+                    <tr>
+                        <td class="td-mono" style="font-size:11.5px;">@e.Ts.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                        <td><strong>@e.Username</strong></td>
+                        <td><span class="badge badge-@badgeClass">@e.Action</span></td>
+                        <td>Asset</td>
+                        <td class="td-mono">@e.Target</td>
+                        <td style="color:var(--text3);text-decoration:line-through;">—</td>
+                        <td>@e.Target</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="audit-integrity-bar">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+    </svg>
+    Warning: Attempted modification of these records is blocked at the database level and flagged to compliance partners.
+</div>
+
+@code {
+    string searchQuery = "", actionFilter = "";
+
+    IEnumerable<AuditEntryDto> Filtered => State.AuditLog.Where(e =>
+    {
+        var q = searchQuery.ToLower();
+        if (!string.IsNullOrEmpty(q) && !new[] { e.Username, e.Action, e.Target }
+            .Any(v => v?.ToLower().Contains(q) == true)) return false;
+        if (!string.IsNullOrEmpty(actionFilter) && !e.Action.Contains(actionFilter, StringComparison.OrdinalIgnoreCase)) return false;
+        return true;
+    });
+}

@@ -1,0 +1,24 @@
+@*
+    FILE:    _Imports.razor
+    PROJECT: AssetManagement.Client
+    PURPOSE: Blazor global imports file. Every @using directive declared here is
+             automatically available in all .razor files in the project without needing
+             to repeat the using statement in each file. Includes the core Blazor
+             namespaces, the shared DTO models, and the client service namespaces
+             (ServerApiClient, ClientApplicationState). Named _Imports.razor because
+             Blazor's framework specifically looks for this filename.
+*@
+
+@using System.Net.Http
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Web.Virtualization
+@using Microsoft.AspNetCore.Components.WebAssembly.Http
+@using Microsoft.JSInterop
+@using AssetManagement.Client
+@using AssetManagement.Client.Services
+@using AssetManagement.Client.Pages
+@using AssetManagement.Client.Shared
+@using AssetManagement.Shared.Models

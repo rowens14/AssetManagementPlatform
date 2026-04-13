@@ -1,0 +1,21 @@
+@*
+    FILE:    UserRoleBadge.razor
+    PROJECT: AssetManagement.Client / Shared
+    PURPOSE: Reusable inline badge component that renders a colour-coded pill label
+             for a user's RBAC role (Admin, Manager, Viewer). Admin badges are amber,
+             Manager badges are blue, and Viewer badges are grey, matching the colour
+             scheme defined in app.css. Used in user list tables and the sidebar
+             user info panel to provide clear visual role identification.
+*@
+
+<span class="badge badge-@CssClass">@Role</span>
+
+@code {
+    [Parameter] public string Role { get; set; } = "";
+    string CssClass => Role?.ToLower() switch
+    {
+        "admin"   => "admin",
+        "manager" => "manager",
+        _         => "viewer"
+    };
+}

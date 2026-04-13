@@ -1,0 +1,85 @@
+@*
+    FILE:    AppNavigationSidebar.razor
+    PROJECT: AssetManagement.Client / Shared
+    PURPOSE: Persistent dark-navy left sidebar component rendered inside App.razor.
+             Displays the ASSET_MGR brand, the current user's display name and role,
+             and the four main navigation items (Hardware Inventory, Software & Licenses,
+             Audit Log, Reports). Highlights the active page and calls
+             ClientApplicationState.Navigate() on click. Also renders the Sign Out
+             button at the bottom which calls ClientApplicationState.Logout().
+             Used across all authenticated pages.
+*@
+
+@inject ClientApplicationState State
+
+
+<div class="topbar-outer">
+    <div class="topbar-brand">
+        <div class="topbar-brand-icon">IT</div>
+        <span class="topbar-brand-name">ASSET_MGR</span>
+    </div>
+    <div class="topbar-right">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        NAPLES / FORT MYERS
+    </div>
+</div>
+
+
+<nav class="sidebar">
+    <div class="sidebar-user">
+        <div class="sidebar-avatar">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
+        </div>
+        <div>
+            <div class="sidebar-user-name">@State.CurrentUser?.DisplayName</div>
+            <div class="sidebar-user-role">@State.CurrentUser?.Role</div>
+        </div>
+    </div>
+
+    <button class="nav-item @(State.CurrentPage == "hardware" ? "active" : "")" @onclick='() => State.Navigate("hardware")'>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        Hardware Inventory
+    </button>
+
+    <button class="nav-item @(State.CurrentPage == "software" ? "active" : "")" @onclick='() => State.Navigate("software")'>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+        </svg>
+        Software &amp; Licenses
+    </button>
+
+    <button class="nav-item @(State.CurrentPage == "audit" ? "active" : "")" @onclick='() => State.Navigate("audit")'>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Audit Log
+    </button>
+
+    <button class="nav-item @(State.CurrentPage == "reports" ? "active" : "")" @onclick='() => State.Navigate("reports")'>
+        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        Reports
+    </button>
+
+    <div class="sidebar-spacer"></div>
+
+    <button class="sidebar-signout" @onclick="State.Logout">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Sign Out
+    </button>
+</nav>

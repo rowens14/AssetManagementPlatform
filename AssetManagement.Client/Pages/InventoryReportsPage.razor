@@ -1,0 +1,110 @@
+@*
+    FILE:    InventoryReportsPage.razor
+    PROJECT: AssetManagement.Client / Pages
+    PURPOSE: Inventory and compliance reports page (Screen 9 of the UI mockup).
+             Allows staff to select a report type (Inventory, Compliance, License
+             Utilization, Lifecycle Events, Assignment History) and an optional site
+             filter, then generate a live preview table. Provides PDF and CSV export
+             buttons (wired to future report generation endpoints).
+             Maps to Requirements FR 07, FR 08, FR 10.
+*@
+
+@inject ClientApplicationState State
+
+
+<div class="page-hdr">
+    <div class="page-hdr-left">
+        <h2>Reports: Inventory &amp; Compliance</h2>
+        
+    </div>
+</div>
+
+<div class="reports-panel">
+    <div class="form-group" style="min-width:220px">
+        <label>Report Type</label>
+        <select @bind="reportType">
+            <option>Inventory Report</option>
+            <option>Compliance Report</option>
+            <option>License Utilization Report</option>
+            <option>Lifecycle Event Report</option>
+            <option>Assignment History Report</option>
+        </select>
+    </div>
+    <div class="form-group" style="min-width:160px">
+        <label>Site Filter</label>
+        <select @bind="siteFilter">
+            <option value="0">All Sites</option>
+            @foreach (var s in State.Sites) { <option value="@s.Id">@s.Name</option> }
+        </select>
+    </div>
+    <div class="reports-actions">
+        <button class="btn btn-primary" @onclick="GeneratePreview">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Generate Preview
+        </button>
+        <button class="btn btn-secondary">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            PDF
+        </button>
+        <button class="btn btn-secondary">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            CSV
+        </button>
+    </div>
+</div>
+
+@if (showPreview)
+{
+    <div class="card" style="margin-top:18px;">
+        <div class="card-header">
+            <div class="card-title">@reportType — @(siteFilter == 0 ? "All Sites" : State.GetSite(siteFilter)?.Name)</div>
+            <span style="font-size:11px;color:var(--text3);">Generated @DateTime.Now.ToString("yyyy-MM-dd HH:mm")</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Asset ID</th><th>Type</th><th>Model</th><th>Site</th><th>Status</th><th>Assigned To</th><th>Last Audit</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var a in PreviewRows)
+                    {
+                        var assigned = State.Assignments.FirstOrDefault(x => x.AssetId == a.Id && x.IsActive);
+                        <tr>
+                            <td><span class="chip">@a.AssetCode</span></td>
+                            <td>@a.AssetType</td>
+                            <td>@a.Model</td>
+                            <td>@(State.GetSite(a.SiteId)?.Name ?? "—")</td>
+                            <td><AssetStatusBadge Status="@a.LifecycleStatus" /></td>
+                            <td>@(assigned != null ? State.GetUser(assigned.UserId)?.DisplayName ?? "—" : "—")</td>
+                            <td class="td-mono">@(a.LastAudit.HasValue ? a.LastAudit.Value.ToString("yyyy-MM-dd") : "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+
+@code {
+    string reportType = "Inventory Report";
+    int siteFilter = 0;
+    bool showPreview = false;
+
+    IEnumerable<AssetDto> PreviewRows => siteFilter == 0
+        ? State.Assets
+        : State.Assets.Where(a => a.SiteId == siteFilter);
+
+    void GeneratePreview() => showPreview = true;
+}

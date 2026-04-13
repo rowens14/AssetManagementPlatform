@@ -1,0 +1,90 @@
+@*
+    FILE:    UserLoginPage.razor
+    PROJECT: AssetManagement.Client / Pages
+    PURPOSE: Login screen. Presents a username and password form — no role selection
+             required. On submit, calls ClientApplicationState.LoginAsync() which posts
+             credentials to UserAuthenticationController on the server. The server looks
+             up the account, verifies the password, and returns the full user profile
+             including their assigned role (Admin, Manager, or Viewer). The role is
+             determined entirely by which account the credentials belong to.
+             Displays an inline error message if authentication fails.
+             Maps to Requirement FR 07 (authentication).
+*@
+
+@inject ClientApplicationState State
+
+<div class="login-screen">
+    <div class="login-card">
+        <div class="login-brand">
+            <div class="login-brand-icon">IT</div>
+            <div class="login-brand-text">
+                <h1>AAMS</h1>
+                
+            </div>
+        </div>
+
+        <div class="login-field">
+            <label>Username</label>
+            <input type="text" @bind="username" @bind:event="oninput" @onkeydown="HandleKey" placeholder="Enter username" />
+        </div>
+        <div class="login-field">
+            <label>Password</label>
+            <input type="password" @bind="password" @bind:event="oninput" @onkeydown="HandleKey" />
+        </div>
+
+        @if (showError)
+        {
+            <div class="login-error">@errorMsg</div>
+        }
+
+        <button class="btn-login" @onclick="DoLogin" disabled="@isLoading">
+            @if (isLoading)
+            {
+                <div class="spinner" style="border-color:rgba(255,255,255,.3);border-top-color:white;width:14px;height:14px;border-width:2px;"></div>
+                <span>Signing in…</span>
+            }
+            else
+            {
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                    <polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+                </svg>
+                <span>Sign In</span>
+            }
+        </button>
+
+        <div class="login-notice">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            Notice: Unauthorized actions are blocked and recorded in the immutable audit log for compliance.
+        </div>
+
+        <div class="login-req-footer">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            Notice: All unauthorized actions are blocked and will be logged.
+        </div>
+    </div>
+</div>
+
+@code {
+    string username = "", password = "";
+    bool showError, isLoading;
+    string errorMsg = "Invalid username or password.";
+
+    async Task DoLogin()
+    {
+        if (isLoading) return;
+        isLoading = true; showError = false;
+        var err = await State.LoginAsync(username, password);
+        isLoading = false;
+        if (err != null) { errorMsg = err; showError = true; }
+    }
+
+    async Task HandleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await DoLogin();
+    }
+}

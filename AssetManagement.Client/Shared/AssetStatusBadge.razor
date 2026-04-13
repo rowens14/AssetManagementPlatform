@@ -1,0 +1,29 @@
+@*
+    FILE:    AssetStatusBadge.razor
+    PROJECT: AssetManagement.Client / Shared
+    PURPOSE: Reusable inline badge component that renders a colour-coded pill label
+             for an asset or license lifecycle status string. Maps status values
+             (Available, Deployed, Maintenance, Retired, Disposed, Active, Expired,
+             Pending, Inactive) to their corresponding CSS badge classes defined in
+             app.css. Used throughout the inventory tables, asset detail view, and
+             lifecycle history tab to provide consistent visual status indicators.
+*@
+
+<span class="badge badge-@CssClass">@Status</span>
+
+@code {
+    [Parameter] public string Status { get; set; } = "";
+
+    string CssClass => Status?.ToLower() switch
+    {
+        "available"   => "available",
+        "deployed"    => "deployed",
+        "maintenance" => "maintenance",
+        "retired"     => "retired",
+        "disposed"    => "disposed",
+        "active"      => "active",
+        "inactive"    => "inactive",
+        "expired"     => "expired",
+        _             => "available"
+    };
+}

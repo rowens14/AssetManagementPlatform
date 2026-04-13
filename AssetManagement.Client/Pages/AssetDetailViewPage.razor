@@ -1,0 +1,309 @@
+@*
+    FILE:    AssetDetailViewPage.razor
+    PROJECT: AssetManagement.Client / Pages
+    PURPOSE: Full asset detail view (Screen 4 of the UI mockup). Displays complete
+             information about a single hardware asset across four tabs:
+               Overview         — Identity, configuration, deployment, and security fields
+               Assignment History — All past and present user assignments for this asset
+               Lifecycle History  — Full status transition history with reasons
+               Audit Log          — Compliance audit trail filtered to this asset
+             Action buttons in the header trigger modals in App.razor (Assign, Update
+             Status, Edit) or call ClientApplicationState.DeleteAssetAsync directly.
+             The Security & Compliance section is only visible to Admin and Manager roles.
+            
+*@
+
+@inject ClientApplicationState State
+
+@{
+    var asset = Asset;
+    if (asset == null) { <p>Asset not found.</p> return; }
+    var assigned = State.Assignments.FirstOrDefault(x => x.AssetId == asset.Id && x.IsActive);
+    var assignedUser = assigned != null ? State.GetUser(assigned.UserId) : null;
+    var site = State.GetSite(asset.SiteId);
+    var dept = assignedUser != null ? State.GetDept(assignedUser.DeptId) : null;
+}
+
+<button class="detail-back-btn" @onclick='()=>OnBack.InvokeAsync()'>
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Back
+</button>
+
+<div class="page-header">
+    <div class="page-header-left">
+        <h2>Asset Detail View: @asset.AssetCode</h2>
+        
+    </div>
+    <div class="detail-action-bar">
+        @if (State.CanEdit) {
+            <button class="btn btn-secondary" @onclick='()=>OnAssign.InvokeAsync(asset)'>
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                Assign
+            </button>
+            <button class="btn btn-secondary" @onclick='()=>OnUpdateStatus.InvokeAsync(asset)'>
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Update Status
+            </button>
+            <button class="btn btn-primary" @onclick='()=>OnEdit.InvokeAsync(asset)'>
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Edit
+            </button>
+            <button class="btn btn-danger" @onclick='async ()=>await DeleteAsset(asset.Id)'>
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+                Delete
+            </button>
+        }
+    </div>
+</div>
+
+<div class="tab-bar">
+    <button class="tab-btn @(activeTab=="overview"?"active":"")" @onclick='()=>activeTab="overview"'>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Overview
+    </button>
+    <button class="tab-btn @(activeTab=="assignments"?"active":"")" @onclick='()=>activeTab="assignments"'>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Assignment History
+    </button>
+    <button class="tab-btn @(activeTab=="lifecycle"?"active":"")" @onclick='()=>activeTab="lifecycle"'>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Lifecycle History
+    </button>
+    <button class="tab-btn @(activeTab=="auditlog"?"active":"")" @onclick='()=>activeTab="auditlog"'>
+        <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Audit Log
+    </button>
+</div>
+
+@if (activeTab == "overview")
+{
+    <div class="detail-card">
+        <div class="detail-3col">
+            <div class="detail-col">
+                <div class="detail-col-title">Identity</div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Asset ID</div>
+                    <div class="detail-field-value mono">@asset.AssetCode</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Asset Tag</div>
+                    <div class="detail-field-value mono">@asset.AssetTag</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Serial Number</div>
+                    <div class="detail-field-value mono">@asset.SerialNumber</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Hostname</div>
+                    <div class="detail-field-value mono">@(string.IsNullOrEmpty(asset.Hostname) ? "—" : asset.Hostname)</div>
+                </div>
+            </div>
+            <div class="detail-col">
+                <div class="detail-col-title">Configuration</div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Type</div>
+                    <div class="detail-field-value">@asset.AssetType</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Manufacturer</div>
+                    <div class="detail-field-value">@asset.Manufacturer</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Model</div>
+                    <div class="detail-field-value">@asset.Model</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Description</div>
+                    <div class="detail-field-value">@(string.IsNullOrEmpty(asset.Description) ? "—" : asset.Description)</div>
+                </div>
+            </div>
+            <div class="detail-col">
+                <div class="detail-col-title">Deployment</div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Site</div>
+                    <div class="detail-field-value">@(site?.Name ?? "—")</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Department</div>
+                    <div class="detail-field-value">@(dept?.Name ?? "—")</div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Status</div>
+                    <div class="detail-field-value"><AssetStatusBadge Status="@asset.LifecycleStatus" /></div>
+                </div>
+                <div class="detail-field">
+                    <div class="detail-field-label">Assigned To</div>
+                    <div class="detail-field-value">@(assignedUser?.DisplayName ?? "—")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (State.CurrentUser?.Role is "Admin" or "Manager")
+    {
+        <div class="detail-security-card">
+            <div class="detail-security-title">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Security &amp; Compliance (Restricted)
+            </div>
+            <div class="detail-3col">
+                <div class="detail-col">
+                    <div class="detail-field">
+                        <div class="detail-field-label">Compliance ID</div>
+                        <div class="detail-field-value mono">@(string.IsNullOrEmpty(asset.ComplianceId) ? "—" : asset.ComplianceId)</div>
+                    </div>
+                </div>
+                <div class="detail-col">
+                    <div class="detail-field">
+                        <div class="detail-field-label">Encryption Protocol</div>
+                        <div class="detail-field-value mono">@(string.IsNullOrEmpty(asset.EncryptionProtocol) ? "—" : asset.EncryptionProtocol)</div>
+                    </div>
+                </div>
+                <div class="detail-col">
+                    <div class="detail-field">
+                        <div class="detail-field-label">Last Security Audit</div>
+                        <div class="detail-field-value">@(asset.LastAudit?.ToString("yyyy-MM-dd") ?? "—")</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@if (activeTab == "assignments")
+{
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Assigned To</th>
+                    <th>Effective Date</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                    <th>Created By</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var assetAssignments = State.Assignments
+                        .Where(x => x.AssetId == asset.Id)
+                        .OrderByDescending(x => x.EffectiveDate)
+                        .ToList();
+                }
+                @foreach (var asgn in assetAssignments)
+                {
+                    <tr>
+                        <td>@asgn.UserDisplayName</td>
+                        <td class="td-mono">@asgn.EffectiveDate.ToString("yyyy-MM-dd")</td>
+                        <td class="td-mono">@(asgn.EndDate?.ToString("yyyy-MM-dd") ?? "—")</td>
+                        <td>
+                            @if (asgn.IsActive) {
+                                <span class="badge badge-active">Active</span>
+                            } else {
+                                <span class="badge badge-retired">Returned</span>
+                            }
+                        </td>
+                        <td>@asgn.CreatedByDisplayName</td>
+                    </tr>
+                }
+                @if (!assetAssignments.Any())
+                {
+                    <tr><td colspan="5"><div class="empty-state">No assignment history</div></td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (activeTab == "lifecycle")
+{
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>From Status</th>
+                    <th>To Status</th>
+                    <th>Reason</th>
+                    <th>Changed By</th>
+                    <th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var assetEvents = State.LifecycleEvents
+                        .Where(x => x.AssetId == asset.Id)
+                        .OrderByDescending(x => x.ChangedAt)
+                        .ToList();
+                }
+                @foreach (var ev in assetEvents)
+                {
+                    <tr>
+                        <td><AssetStatusBadge Status="@ev.OldStatus" /></td>
+                        <td><AssetStatusBadge Status="@ev.NewStatus" /></td>
+                        <td>@ev.Reason</td>
+                        <td>@ev.ChangedByDisplayName</td>
+                        <td class="td-mono">@ev.ChangedAt.ToString("yyyy-MM-dd")</td>
+                    </tr>
+                }
+                @if (!assetEvents.Any())
+                {
+                    <tr><td colspan="5"><div class="empty-state">No lifecycle history</div></td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@if (activeTab == "auditlog")
+{
+    <div class="table-card">
+        <table>
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var assetAudit = State.AuditLog
+                        .Where(x => x.Target.Contains(asset.AssetCode))
+                        .OrderByDescending(x => x.Ts)
+                        .ToList();
+                }
+                @foreach (var e in assetAudit)
+                {
+                    <tr>
+                        <td class="td-mono">@e.Ts.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                        <td><strong>@e.Username</strong></td>
+                        <td><span class="badge badge-create">@e.Action</span></td>
+                        <td>@e.Target</td>
+                    </tr>
+                }
+                @if (!assetAudit.Any())
+                {
+                    <tr><td colspan="4"><div class="empty-state">No audit entries for this asset</div></td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    [Parameter] public AssetDto? Asset { get; set; }
+    [Parameter] public EventCallback OnBack { get; set; }
+    [Parameter] public EventCallback<AssetDto> OnEdit { get; set; }
+    [Parameter] public EventCallback<AssetDto> OnAssign { get; set; }
+    [Parameter] public EventCallback<AssetDto> OnUpdateStatus { get; set; }
+    [Parameter] public EventCallback OnDeleted { get; set; }
+
+    string activeTab = "overview";
+
+    async Task DeleteAsset(int id)
+    {
+        await State.DeleteAssetAsync(id);
+        await OnDeleted.InvokeAsync();
+    }
+}
