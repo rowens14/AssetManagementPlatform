@@ -1,4 +1,4 @@
-
+There needs to be a couple changes made to the readme file. Mainly being the project structure change. This layout is no longer accurate after integrating the actual db into the app rather than the in memory db.
 ---
 
 ## Project Structure
@@ -56,6 +56,8 @@ AssetManagement.sln
 - The default logins are still going to be used for testing. This is going to be finalized soon.
 
 ---
+
+
 
 ## Default Logins
 
